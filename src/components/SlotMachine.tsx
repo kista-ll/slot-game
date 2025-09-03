@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Reel } from './Reel';
 import { BetControls } from './BetControls';
 import '../SlotMachine.css';
+import { AudioController } from '../utils/AudioController';
 
+const audioController = useRef(new AudioController()).current;
+const winAudioController = useRef(new AudioController()).current;
 const payoutTable: Record<string, number> = {
   '🍒': 2, '🍋': 3, '🔔': 5, '⭐': 8, '🍀': 10, '7️⃣': 20,
 };
@@ -11,6 +14,8 @@ const winSounds: Record<string, string> = {
   '🔔': '/sounds/win1.mp3', '⭐': '/sounds/win1.mp3',
   '🍀': '/sounds/win1.mp3', '7️⃣': '/sounds/win2.mp3',
 };
+
+const maxPurchasesPerDay = 3;
 
 export const SlotMachine: React.FC = () => {
   const [spinning, setSpinning] = useState([false, false, false]);
@@ -23,14 +28,26 @@ export const SlotMachine: React.FC = () => {
   const [lastWinMessage, setLastWinMessage] = useState('');
   const [history, setHistory] = useState<string[][]>([]);
   const [symbolCounts, setSymbolCounts] = useState<Record<string, number>>({});
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const winAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [purchaseCount, setPurchaseCount] = useState<number>(0);
+
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('slotHistory');
     const savedCounts = localStorage.getItem('slotCounts');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
     if (savedCounts) setSymbolCounts(JSON.parse(savedCounts));
+
+    const today = new Date().toISOString().slice(0, 10);
+    const savedDate = localStorage.getItem('slotPurchaseDate');
+    const savedCount = parseInt(localStorage.getItem('slotPurchaseCount') || '0', 10);
+
+    if (savedDate === today) {
+      setPurchaseCount(savedCount);
+    } else {
+      localStorage.setItem('slotPurchaseDate', today);
+      localStorage.setItem('slotPurchaseCount', '0');
+      setPurchaseCount(0);
+    }
   }, []);
 
   const startSpin = () => {
@@ -43,11 +60,11 @@ export const SlotMachine: React.FC = () => {
       localStorage.setItem('slotScore', newScore.toString());
       return newScore;
     });
-    playSound('/sounds/spin.wav');
+    audioController.play('/sounds/spin.wav');
   };
 
   const stopReel = (index: number, symbol: string) => {
-    playSound('/sounds/stop.mp3');
+    audioController.play('/sounds/stop.mp3');
     setSpinning((prev) => {
       const updated = [...prev];
       updated[index] = false;
@@ -60,32 +77,31 @@ export const SlotMachine: React.FC = () => {
     });
   };
 
-  const isAllStopped = spinning.every((s) => !s);
-  const isWin = result.every((s) => s === result[0]);
-
-  const playSound = (src: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    const audio = new Audio(src);
-    audio.volume = 1.0;
-    audio.play().catch(() => {});
-    audioRef.current = audio;
-  };
-
   const playWinSound = (symbol: string) => {
     const src = winSounds[symbol];
-    if (!src) return;
-    if (winAudioRef.current) {
-      winAudioRef.current.pause();
-      winAudioRef.current.currentTime = 0;
+    if (src) {
+      winAudioController.play(src);
     }
-    const audio = new Audio(src);
-    audio.volume = 1.0;
-    audio.play().catch(() => {});
-    winAudioRef.current = audio;
   };
+  const handlePurchase = () => {
+    if (purchaseCount >= maxPurchasesPerDay) return;
+
+    const added = 100;
+    const newScore = score + added;
+    const newCount = purchaseCount + 1;
+    const today = new Date().toISOString().slice(0, 10);
+
+    setScore(newScore);
+    setPurchaseCount(newCount);
+    localStorage.setItem('slotScore', newScore.toString());
+    localStorage.setItem('slotPurchaseCount', newCount.toString());
+    localStorage.setItem('slotPurchaseDate', today);
+  };
+
+  // 判定: 全リールが停止しているか
+  const isAllStopped = spinning.every((s) => !s);
+  // 判定: 当たりかどうか（全て同じ絵柄）
+  const isWin = result.every((r) => r === result[0] && r !== '❔');
 
   useEffect(() => {
     if (isAllStopped && result.every((r) => r !== '❔')) {
@@ -121,25 +137,33 @@ export const SlotMachine: React.FC = () => {
       <BetControls bet={bet} score={score} setBet={setBet} />
 
       <button
-        onClick={startSpin}
-        disabled={spinning.some((s) => s) || score < bet}
-        style={{ marginTop: '1rem' }}
+        onClick={handlePurchase}
+        disabled={purchaseCount >= maxPurchasesPerDay}
+        style={{ marginTop: '0.5rem' }}
       >
-        スピン！
+        残高を購入（+100点） {purchaseCount}/{maxPurchasesPerDay}
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
-        {[0, 1, 2].map((i) => (
-          <Reel
-            key={i}
-            index={i}
-            spinning={spinning[i]}
-            onStop={(symbol) => stopReel(i, symbol)}
-          />
-        ))}
-      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {[0, 1, 2].map((i) => (
+            <Reel
+              key={i}
+              index={i}
+              spinning={spinning[i]}
+              onStop={(symbol) => stopReel(i, symbol)}
+            />
+          ))}
+        </div>
 
-      
+        <button
+          onClick={startSpin}
+          disabled={spinning.some((s) => s) || score < bet}
+          className="lever-button"
+        >
+          🎯
+        </button>
+      </div>
 
       {isAllStopped && (
         <div style={{ marginTop: '1rem', fontSize: '1.5rem' }}>
