@@ -5,7 +5,7 @@ const App: React.FC = () => {
   return (
     <div>
       <div className="bet-controls">
-</div>
+      </div>
       <SlotMachine />
     </div>
   );
