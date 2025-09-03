@@ -209,7 +209,6 @@ export const SlotMachine: React.FC = () => {
         {[0, 1, 2].map((i) => (
         <Reel
           key={i}
-          index={i}
           spinning={spinning[i]}
           onStop={(symbol) => stopReel(i, symbol)}
           isReachTarget={reachActive && reachTargets.includes(i)}

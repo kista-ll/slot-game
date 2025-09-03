@@ -1,33 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export const usePurchaseLimit = (maxPerDay: number) => {
+const STORAGE_DATE_KEY = 'slotPurchaseDate';
+const STORAGE_COUNT_KEY = 'slotPurchaseCount';
+const MAX_PURCHASES_PER_DAY = 3;
+
+const getTodayString = (): string => {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+};
+
+const isToday = (dateStr: string): boolean => {
+  return dateStr === getTodayString();
+};
+
+export const usePurchaseLimit = (max: number = MAX_PURCHASES_PER_DAY) => {
   const [count, setCount] = useState(0);
-  const [isToday, setIsToday] = useState(true);
+  const [canPurchase, setCanPurchase] = useState(true);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const savedDate = localStorage.getItem('slotPurchaseDate');
-    const savedCount = parseInt(localStorage.getItem('slotPurchaseCount') || '0', 10);
+    const savedDate = localStorage.getItem(STORAGE_DATE_KEY) || '';
+    const savedCount = parseInt(localStorage.getItem(STORAGE_COUNT_KEY) || '0', 10);
 
-    if (savedDate === today) {
+    if (isToday(savedDate)) {
       setCount(savedCount);
+      setCanPurchase(savedCount < max);
     } else {
-      localStorage.setItem('slotPurchaseDate', today);
-      localStorage.setItem('slotPurchaseCount', '0');
+      // 新しい日 → カウントリセット
+      localStorage.setItem(STORAGE_DATE_KEY, getTodayString());
+      localStorage.setItem(STORAGE_COUNT_KEY, '0');
       setCount(0);
-      setIsToday(false);
+      setCanPurchase(true);
     }
-  }, []);
+  }, [max]);
 
   const increment = () => {
-    const today = new Date().toISOString().slice(0, 10);
     const newCount = count + 1;
     setCount(newCount);
-    localStorage.setItem('slotPurchaseCount', newCount.toString());
-    localStorage.setItem('slotPurchaseDate', today);
+    localStorage.setItem(STORAGE_COUNT_KEY, newCount.toString());
+    localStorage.setItem(STORAGE_DATE_KEY, getTodayString());
+    setCanPurchase(newCount < max);
   };
 
-  const canPurchase = count < maxPerDay;
-
-  return { count, canPurchase, increment };
+  return {
+    count,
+    canPurchase,
+    increment,
+  };
 };

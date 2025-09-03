@@ -4,7 +4,6 @@ import './Reel.css';
 type Props = {
     spinning: boolean;
     onStop: (symbol: string) => void;
-    index: number;
     isReachTarget?: boolean;
 };
 
@@ -17,7 +16,7 @@ const symbolImages: Record<string, string> = {
     '🍀': '/images/clover.png',
     '7️⃣': '/images/seven.png',
 };
-const symbolHeight = 240;
+const symbolHeight = 236;
 const reelHeight = 240;
 const totalSymbols = symbolList.length;
 
@@ -34,10 +33,12 @@ const getTranslateY = (element: HTMLElement): number => {
 
 const getCenterSymbolIndex = (translateY: number): number => {
     const offset = Math.abs(translateY) + reelHeight / 2;
+    const index = Math.floor(offset / symbolHeight) % totalSymbols;
+    console.log('TranslateY:', translateY, 'Offset:', offset, 'Index:', index);
     return Math.floor(offset / symbolHeight) % totalSymbols;
 };
 
-export const Reel: React.FC<Props> = ({ spinning, onStop, index, isReachTarget }) => {
+export const Reel: React.FC<Props> = ({ spinning, onStop, isReachTarget }) => {
     const reelRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [centerIndex, setCenterIndex] = useState<number | null>(null);
@@ -62,6 +63,7 @@ export const Reel: React.FC<Props> = ({ spinning, onStop, index, isReachTarget }
             const center = getCenterSymbolIndex(actualY);
             const symbol = symbolList[center];
             const translateY = -(center * symbolHeight);
+            console.log('Stopping at symbol:', symbol, 'TranslateY:', translateY);
             reel.style.transform = `translateY(${translateY}px)`;
 
             container.classList.add('stopping');
