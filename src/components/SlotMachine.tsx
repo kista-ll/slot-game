@@ -17,7 +17,14 @@ const payoutTable: Record<string, number> = {
   '🍀': 10,
   '7️⃣': 20,
 };
-
+const winSounds: Record<string, string> = {
+  '🍒': '/sounds/win1.mp3',
+  '🍋': '/sounds/win1.mp3',
+  '🔔': '/sounds/win1.mp3',
+  '⭐': '/sounds/win1.mp3',
+  '🍀': '/sounds/win1.mp3',
+  '7️⃣': '/sounds/win2.mp3',
+};
 const getTranslateY = (element: HTMLElement): number => {
   const style = window.getComputedStyle(element);
   const matrix = style.transform;
@@ -48,6 +55,8 @@ export const SlotMachine: React.FC = () => {
   });
   const [bet, setBet] = useState<number>(10);
   const [lastWinMessage, setLastWinMessage] = useState<string>('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const winAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('slotHistory');
@@ -66,7 +75,7 @@ export const SlotMachine: React.FC = () => {
       localStorage.setItem('slotScore', newScore.toString());
       return newScore;
     });
-
+    playSound('/sounds/spin.wav');
     reelRefs.forEach((ref) => {
       if (ref.current) {
         void ref.current.offsetWidth;
@@ -79,6 +88,7 @@ export const SlotMachine: React.FC = () => {
   const stopReel = (index: number) => {
     const reel = reelRefs[index].current;
     const container = reelContainers[index].current;
+    playSound('/sounds/stop.mp3');
     if (reel && container) {
       const actualY = getTranslateY(reel);
       reel.classList.remove('fast', 'slow');
@@ -110,7 +120,42 @@ export const SlotMachine: React.FC = () => {
 
   const isAllStopped = spinning.every((s) => !s);
   const isWin = result.every((s) => s === result[0]);
+  const playSound = (src: string) => {
+    // 前の音を止める
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
 
+    // 新しい音を再生
+    const audio = new Audio(src);
+    audio.volume = 1.0;
+    audio.muted = false;
+    audio.play().catch((err) => {
+      console.error('Audio playback failed:', err);
+    });
+
+    // インスタンスを保存
+    audioRef.current = audio;
+  };
+  const playWinSound = (symbol: string) => {
+    const soundSrc = winSounds[symbol];
+    if (!soundSrc) return;
+
+    // 前の音を止める
+    if (winAudioRef.current) {
+      winAudioRef.current.pause();
+      winAudioRef.current.currentTime = 0;
+    }
+
+    const audio = new Audio(soundSrc);
+    audio.volume = 1.0;
+    audio.play().catch((err) => {
+      console.error('Win sound playback failed:', err);
+    });
+
+    winAudioRef.current = audio;
+  };
   useEffect(() => {
     if (isAllStopped && result.every((r) => r !== '❔')) {
       const newHistory = [result, ...history.slice(0, 9)];
@@ -132,6 +177,9 @@ export const SlotMachine: React.FC = () => {
         setScore(newScore);
         localStorage.setItem('slotScore', newScore.toString());
         setLastWinMessage(`${symbol}で${multiplier}倍！ +${reward}点`);
+
+        // 🎵 当たり音を鳴らす
+        playWinSound(symbol);
       }
     }
   }, [isAllStopped]);
