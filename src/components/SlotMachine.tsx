@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Reel } from './Reel';
 import { BetControls } from './BetControls';
-import '../SlotMachine.css';
+import { usePurchaseLimit } from '../hooks/usePurchaseLimit';
 import { AudioController } from '../utils/AudioController';
+import '../SlotMachine.css';
 
-const audioController = useRef(new AudioController()).current;
-const winAudioController = useRef(new AudioController()).current;
 const payoutTable: Record<string, number> = {
   '🍒': 2, '🍋': 3, '🔔': 5, '⭐': 8, '🍀': 10, '7️⃣': 20,
 };
@@ -14,8 +13,6 @@ const winSounds: Record<string, string> = {
   '🔔': '/sounds/win1.mp3', '⭐': '/sounds/win1.mp3',
   '🍀': '/sounds/win1.mp3', '7️⃣': '/sounds/win2.mp3',
 };
-
-const maxPurchasesPerDay = 3;
 
 export const SlotMachine: React.FC = () => {
   const [spinning, setSpinning] = useState([false, false, false]);
@@ -28,26 +25,21 @@ export const SlotMachine: React.FC = () => {
   const [lastWinMessage, setLastWinMessage] = useState('');
   const [history, setHistory] = useState<string[][]>([]);
   const [symbolCounts, setSymbolCounts] = useState<Record<string, number>>({});
-  const [purchaseCount, setPurchaseCount] = useState<number>(0);
 
+  const audioController = useRef(new AudioController()).current;
+  const winAudioController = useRef(new AudioController()).current;
+
+  const {
+    count: purchaseCount,
+    canPurchase,
+    increment: incrementPurchase,
+  } = usePurchaseLimit(3);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('slotHistory');
     const savedCounts = localStorage.getItem('slotCounts');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
     if (savedCounts) setSymbolCounts(JSON.parse(savedCounts));
-
-    const today = new Date().toISOString().slice(0, 10);
-    const savedDate = localStorage.getItem('slotPurchaseDate');
-    const savedCount = parseInt(localStorage.getItem('slotPurchaseCount') || '0', 10);
-
-    if (savedDate === today) {
-      setPurchaseCount(savedCount);
-    } else {
-      localStorage.setItem('slotPurchaseDate', today);
-      localStorage.setItem('slotPurchaseCount', '0');
-      setPurchaseCount(0);
-    }
   }, []);
 
   const startSpin = () => {
@@ -83,25 +75,18 @@ export const SlotMachine: React.FC = () => {
       winAudioController.play(src);
     }
   };
-  const handlePurchase = () => {
-    if (purchaseCount >= maxPurchasesPerDay) return;
 
+  const handlePurchase = () => {
+    if (!canPurchase) return;
     const added = 100;
     const newScore = score + added;
-    const newCount = purchaseCount + 1;
-    const today = new Date().toISOString().slice(0, 10);
-
     setScore(newScore);
-    setPurchaseCount(newCount);
     localStorage.setItem('slotScore', newScore.toString());
-    localStorage.setItem('slotPurchaseCount', newCount.toString());
-    localStorage.setItem('slotPurchaseDate', today);
+    incrementPurchase();
   };
 
-  // 判定: 全リールが停止しているか
   const isAllStopped = spinning.every((s) => !s);
-  // 判定: 当たりかどうか（全て同じ絵柄）
-  const isWin = result.every((r) => r === result[0] && r !== '❔');
+  const isWin = result.every((s) => s === result[0]);
 
   useEffect(() => {
     if (isAllStopped && result.every((r) => r !== '❔')) {
@@ -138,13 +123,13 @@ export const SlotMachine: React.FC = () => {
 
       <button
         onClick={handlePurchase}
-        disabled={purchaseCount >= maxPurchasesPerDay}
+        disabled={!canPurchase}
         style={{ marginTop: '0.5rem' }}
       >
-        残高を購入（+100点） {purchaseCount}/{maxPurchasesPerDay}
+        残高を購入（+100点） {purchaseCount}/3
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '1rem', marginTop: '1rem' }}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           {[0, 1, 2].map((i) => (
             <Reel
