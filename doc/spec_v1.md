@@ -4,9 +4,10 @@
 - 3リール式スロットゲーム
 - プレイヤーはベット額を設定し、スピンして絵柄を揃える
 - 絵柄が揃うと倍率に応じた報酬を獲得
-- スピン・ストップ・当たり時に音声演出あり
-- 履歴・絵柄出現回数をローカルストレージに保存
-- リール停止ボタンは各リールに統合済み（Reel.tsx内）
+- スピン・ストップ・リーチ・当たり時に音声演出あり
+- 履歴・絵柄出現回数・残高・購入制限をローカルストレージに保存
+- リール停止ボタンは常時表示され、回転中のみ有効（Reel.tsx内）
+- リーチ演出あり：停止済みの最初の2リールが一致した場合に発動
 
 ---
 
@@ -29,49 +30,8 @@
 |----------------|----------------------|------------------------------|
 | スピン開始     | `/sounds/spin.wav`   | 前回の音を停止して再生      |
 | リール停止     | `/sounds/stop.mp3`   | 各リール停止時に再生        |
+| リーチ演出     | `/sounds/reach.wav`  | リーチ成立時に再生          |
 | 当たり演出     | `/sounds/winX.mp3`   | 絵柄に応じて異なる音を再生  |
-
-#### 音声再生関数（共通）
-
-```ts
-const audioRef = useRef<HTMLAudioElement | null>(null);
-
-const playSound = (src: string) => {
-  if (audioRef.current) {
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
-  }
-  const audio = new Audio(src);
-  audio.volume = 1.0;
-  audio.muted = false;
-  audio.play().catch(() => {});
-  audioRef.current = audio;
-};
-```
-
-#### 当たり音再生関数
-
-```ts
-const winAudioRef = useRef<HTMLAudioElement | null>(null);
-
-const playWinSound = (symbol: string) => {
-  const soundSrc = winSounds[symbol];
-  if (!soundSrc) return;
-
-  if (winAudioRef.current) {
-    winAudioRef.current.pause();
-    winAudioRef.current.currentTime = 0;
-  }
-
-  const audio = new Audio(soundSrc);
-  audio.volume = 1.0;
-  audio.play().catch((err) => {
-    console.error('Win sound playback failed:', err);
-  });
-
-  winAudioRef.current = audio;
-};
-```
 
 ---
 
@@ -83,12 +43,14 @@ const startSpin = () => {
   setSpinning([true, true, true]);
   setResult(['❔', '❔', '❔']);
   setLastWinMessage('');
+  setReachActive(false);
+  setReachTargets([]);
   setScore((prev) => {
     const newScore = prev - bet;
     localStorage.setItem('slotScore', newScore.toString());
     return newScore;
   });
-  playSound('/sounds/spin.wav');
+  audioController.play('/sounds/spin.wav');
 };
 ```
 
@@ -96,13 +58,23 @@ const startSpin = () => {
 
 ### 5. リール停止処理（Reel.tsx）
 
-- 停止ボタンは各リールに統合されており、`spinning` が `true` のときのみ表示
+- 停止ボタンは常時表示され、`spinning` が `true` のときのみ有効（`disabled`）
 - 停止時に絵柄を中央に揃え、演出（拡大・浮き上がり）を適用
 - 停止後に `onStop(symbol)` を親に通知
+- 最後のリール停止時にリーチ演出を解除
 
 ---
 
-### 6. 当たり判定と報酬処理（SlotMachine.tsx）
+### 6. リーチ演出（SlotMachine.tsx）
+
+- 停止済みの最初の2リールの絵柄が一致した場合に発動
+- 回転中のリールに光る演出（CSS）
+- リーチSE（`reach.wav`）を再生
+- 画面中央に「🎯 リーチ！」を表示（点滅）
+
+---
+
+### 7. 当たり判定と報酬処理（SlotMachine.tsx）
 
 ```ts
 useEffect(() => {
@@ -134,31 +106,47 @@ useEffect(() => {
 
 ---
 
-### 7. ローカルストレージ保存内容
+### 8. 残高購入制限（usePurchaseLimit.ts）
 
-| キー名         | 内容                     |
-|----------------|--------------------------|
-| `slotScore`    | 現在のスコア             |
-| `slotHistory`  | 最新10件の結果履歴       |
-| `slotCounts`   | 絵柄ごとの出現回数       |
-
----
-
-### 8. コンポーネント構成
-
-| ファイル名         | 役割                                 |
-|--------------------|--------------------------------------|
-| `SlotMachine.tsx`  | ゲーム全体の状態管理とUI             |
-| `Reel.tsx`         | リールの描画・回転・停止・演出       |
-| `BetControls.tsx`  | ベット額の調整UI                     |
-| `Reel.css`         | リールの見た目とアニメーション       |
-| `SlotMachine.css`  | ゲーム全体のレイアウトと共通スタイル |
+- 1回につき +100点
+- 1日最大3回まで購入可能
+- 購入回数と日付を localStorage に保存
+- `canPurchase` によってボタンの有効/無効を制御
 
 ---
 
-### 9. 拡張のアイデア 💡
+### 9. ローカルストレージ保存内容
+
+| キー名                 | 内容                     |
+|------------------------|--------------------------|
+| `slotScore`            | 現在のスコア             |
+| `slotHistory`          | 最新10件の結果履歴       |
+| `slotCounts`           | 絵柄ごとの出現回数       |
+| `slotPurchaseDate`     | 最終購入日（YYYY-MM-DD） |
+| `slotPurchaseCount`    | 当日購入回数（最大3）    |
+
+---
+
+### 10. コンポーネント構成
+
+| ファイル名             | 役割                                 |
+|------------------------|--------------------------------------|
+| `SlotMachine.tsx`      | ゲーム全体の状態管理とUI             |
+| `Reel.tsx`             | リールの描画・回転・停止・演出       |
+| `BetControls.tsx`      | ベット額の調整UI                     |
+| `HistoryPanel.tsx`     | 履歴と絵柄ランキング表示             |
+| `usePurchaseLimit.ts`  | 残高購入制限ロジック                  |
+| `AudioController.ts`   | 音声再生ユーティリティ               |
+| `Reel.css`             | リールの見た目とアニメーション       |
+| `SlotMachine.css`      | ゲーム全体のレイアウトと共通スタイル |
+
+---
+
+### 11. 拡張のアイデア 💡
 - 🎵 音量調整スライダーの追加
 - 🎨 絵柄ごとのアニメーション演出
 - 🏆 スコアランキング機能（ローカル or サーバー連携）
 - 🔁 オートスピン機能
 - 🎧 音声コントローラーの導入（音が増えたら）
+- 🧭 絵柄図鑑・コレクション
+- 🕒 日替わりイベント・季節演出
