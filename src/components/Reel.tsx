@@ -4,7 +4,6 @@ import './Reel.css';
 type Props = {
   spinning: boolean;
   onStop: (symbol: string) => void;
-  bet: number;
   index: number;
 };
 
@@ -37,7 +36,7 @@ const getCenterSymbolIndex = (translateY: number): number => {
   return Math.floor(offset / symbolHeight) % totalSymbols;
 };
 
-export const Reel: React.FC<Props> = ({ spinning, onStop, bet, index }) => {
+export const Reel: React.FC<Props> = ({ spinning, onStop, index }) => {
   const reelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [centerIndex, setCenterIndex] = useState<number | null>(null);

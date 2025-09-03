@@ -134,7 +134,6 @@ export const SlotMachine: React.FC = () => {
             key={i}
             index={i}
             spinning={spinning[i]}
-            bet={bet}
             onStop={(symbol) => stopReel(i, symbol)}
           />
         ))}
