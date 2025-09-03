@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Reel } from './Reel';
 import { BetControls } from './BetControls';
+import { HistoryPanel } from './HistoryPanel';
 import { usePurchaseLimit } from '../hooks/usePurchaseLimit';
 import { AudioController } from '../utils/AudioController';
 import '../SlotMachine.css';
@@ -25,9 +26,12 @@ export const SlotMachine: React.FC = () => {
   const [lastWinMessage, setLastWinMessage] = useState('');
   const [history, setHistory] = useState<string[][]>([]);
   const [symbolCounts, setSymbolCounts] = useState<Record<string, number>>({});
+  const [reachActive, setReachActive] = useState(false);
+  const [reachTargets, setReachTargets] = useState<number[]>([]);
 
   const audioController = useRef(new AudioController()).current;
   const winAudioController = useRef(new AudioController()).current;
+  const reachAudioController = useRef(new AudioController()).current;
 
   const {
     count: purchaseCount,
@@ -47,6 +51,8 @@ export const SlotMachine: React.FC = () => {
     setSpinning([true, true, true]);
     setResult(['❔', '❔', '❔']);
     setLastWinMessage('');
+    setReachActive(false);
+    setReachTargets([]);
     setScore((prev) => {
       const newScore = prev - bet;
       localStorage.setItem('slotScore', newScore.toString());
@@ -60,6 +66,12 @@ export const SlotMachine: React.FC = () => {
     setSpinning((prev) => {
       const updated = [...prev];
       updated[index] = false;
+      // 最後のリールが止まったらリーチ演出を解除
+      const allStopped = updated.every((s) => !s);
+      if (allStopped) {
+        setReachActive(false);
+        setReachTargets([]);
+      }
       return updated;
     });
     setResult((prev) => {
@@ -88,6 +100,31 @@ export const SlotMachine: React.FC = () => {
   const isAllStopped = spinning.every((s) => !s);
   const isWin = result.every((s) => s === result[0]);
 
+  // リーチ判定
+  useEffect(() => {
+    const stopped = result
+      .map((symbol, i) => ({ symbol, i }))
+      .filter(({ symbol }) => symbol !== '❔');
+
+    if (stopped.length >= 2) {
+      const [first, second] = stopped;
+      if (first.symbol === second.symbol) {
+        const targets = spinning
+          .map((s, i) => (s ? i : null))
+          .filter((i): i is number => i !== null);
+
+        if (targets.length > 0) {
+          setReachActive(true);
+          setReachTargets(targets);
+          reachAudioController.play('/sounds/reach.wav');
+        }
+      }
+    } else {
+      setReachActive(false);
+      setReachTargets([]);
+    }
+  }, [result, spinning]);
+
   useEffect(() => {
     if (isAllStopped && result.every((r) => r !== '❔')) {
       const newHistory = [result, ...history.slice(0, 9)];
@@ -115,64 +152,75 @@ export const SlotMachine: React.FC = () => {
   }, [isAllStopped]);
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <h1>🎰 スロットゲーム</h1>
+    <div className="slot-machine-frame" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="slot-header">🎰 スロットゲーム</div>
       <div>残高: {score} 点</div>
 
       <BetControls bet={bet} score={score} setBet={setBet} />
 
       <button
-        onClick={handlePurchase}
-        disabled={!canPurchase}
-        style={{ marginTop: '0.5rem' }}
+      onClick={handlePurchase}
+      disabled={!canPurchase}
+      style={{ marginTop: '0.5rem' }}
       >
-        残高を購入（+100点） {purchaseCount}/3
+      残高を購入（+100点） {purchaseCount}/3
+      </button>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          minHeight: '4rem', // 高さを一定にする
+          justifyContent: 'center',
+        }}
+      >
+        {isAllStopped && (
+          <div style={{ marginTop: '1rem', fontSize: '1.5rem' }}>
+        {isWin ? `🎉 大当たり！ ${lastWinMessage}` : '😢 はずれ...'}
+          </div>
+        )}
+
+        {reachActive && (
+          <div className="reach-banner">
+        🎯 リーチ！
+          </div>
+        )}
+      </div>
+      <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        gap: '1rem',
+        marginTop: '1rem',
+      }}
+      >
+      {/* レバーを左にしたい場合 */}
+      <button
+        onClick={startSpin}
+        disabled={spinning.some((s) => s) || score < bet}
+        className="lever-button"
+      >
+        🎯
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '1rem', marginTop: '1rem' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          {[0, 1, 2].map((i) => (
-            <Reel
-              key={i}
-              index={i}
-              spinning={spinning[i]}
-              onStop={(symbol) => stopReel(i, symbol)}
-            />
-          ))}
-        </div>
-
-        <button
-          onClick={startSpin}
-          disabled={spinning.some((s) => s) || score < bet}
-          className="lever-button"
-        >
-          🎯
-        </button>
+      {/* リール群 */}
+      <div className="reel-area" >
+        {[0, 1, 2].map((i) => (
+        <Reel
+          key={i}
+          index={i}
+          spinning={spinning[i]}
+          onStop={(symbol) => stopReel(i, symbol)}
+          isReachTarget={reachActive && reachTargets.includes(i)}
+        />
+        ))}
       </div>
 
-      {isAllStopped && (
-        <div style={{ marginTop: '1rem', fontSize: '1.5rem' }}>
-          {isWin ? `🎉 大当たり！ ${lastWinMessage}` : '😢 はずれ...'}
-        </div>
-      )}
-
-      <div style={{ marginTop: '2rem' }}>
-        <h2>履歴（最新10件）</h2>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {history.map((entry, i) => (
-            <li key={i}>{entry.join(' | ')}</li>
-          ))}
-        </ul>
-
-        <h2>人気絵柄ランキング</h2>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {Object.entries(symbolCounts)
-            .sort((a, b) => b[1] - a[1])
-            .map(([symbol, count]) => (
-              <li key={symbol}>{symbol}: {count}回</li>
-            ))}
-        </ul>
+      {/* レバーを右にしたい場合はこのボタンを右側に移動 */}
       </div>
+      <HistoryPanel history={history} symbolCounts={symbolCounts} />
     </div>
+
   );
 };

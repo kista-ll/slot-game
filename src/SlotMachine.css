@@ -1,12 +1,16 @@
 /* ゲーム全体のレイアウト */
 body {
+  background: radial-gradient(circle at center, #222 0%, #000 100%);
+  background-attachment: fixed;
+  background-size: cover;
+  color: #eee;
   font-family: 'Segoe UI', sans-serif;
-  background-color: #f8f8f8;
   margin: 0;
   padding: 2rem;
-  text-align: center;
-  color: #333;
+  display: flex;
+  justify-content: center;
 }
+
 
 /* スロットタイトル */
 h1 {
@@ -98,4 +102,50 @@ button:disabled {
 .history-section li {
   margin: 0.25rem 0;
   font-size: 1rem;
+}
+.reach-banner {
+  font-size: 2rem;
+  font-weight: bold;
+  color: gold;
+  animation: reach-pulse 1s ease-in-out infinite;
+  margin-top: 1rem;
+}
+.slot-machine-frame {
+  background: linear-gradient(145deg, #3a3a3a, #1e1e1e);
+  border: 6px solid #666;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow:
+    inset 0 0 10px #000,
+    0 0 20px rgba(0, 0, 0, 0.6),
+    0 8px 16px rgba(0, 0, 0, 0.4);
+  display: inline-block;
+}
+
+.reel-area {
+  background: linear-gradient(to bottom, #111, #222);
+  border: 3px solid #444;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  box-shadow: inset 0 0 10px #000;
+}
+
+.slot-header {
+  font-size: 2rem;
+  color: gold;
+  text-shadow: 2px 2px 4px #000;
+  margin-bottom: 1rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+
+
+@keyframes reach-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
 }
