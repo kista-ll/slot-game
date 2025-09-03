@@ -1,0 +1,106 @@
+.reel {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  overflow: hidden;
+  border: 2px solid #333;
+  background-color: #fff;
+  box-shadow:
+    inset 0px 60px 30px -20px rgba(0, 0, 0, 0.4),
+    inset 0px -60px 30px -20px rgba(0, 0, 0, 0.4);
+  perspective: 800px;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.reel::before,
+.reel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.reel::before {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,1), rgba(255,255,255,0));
+}
+
+.reel::after {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0));
+}
+
+.reel-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 2880px;
+  transform-style: preserve-3d;
+  transform: translateY(0);
+}
+
+.reel-inner img {
+  display: block;
+  width: 240px;
+  height: 240px;
+  image-rendering: pixelated;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: transform 0.3s ease;
+}
+
+.reel-inner img.center {
+  transform: scale(1.0) translateY(0px) translateZ(0px);
+  transform-origin: center bottom;
+  z-index: 3;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+  border-radius: 8px;
+}
+
+@keyframes pop {
+  0% { transform: scale(1) translateY(0) translateZ(0); }
+  50% { transform: scale(1.3) translateY(15px) translateZ(40px); }
+  80% { transform: scale(1.2) translateY(12px) translateZ(30px); }
+  100% { transform: scale(1.0) translateY(0px) translateZ(0px); }
+}
+
+.reel-inner img.center.pop {
+  animation: pop 0.4s ease-out forwards;
+}
+
+.reel-inner.fast {
+  animation: spin-fast 0.8s linear infinite;
+}
+
+.reel-inner.slow {
+  animation: spin-smooth 1.2s cubic-bezier(0.42, 0, 0.58, 1.0) infinite;
+}
+
+@keyframes spin-fast {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-1440px); }
+}
+
+@keyframes spin-smooth {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-1440px); }
+}
+
+.reel.stopping {
+  animation: flash 0.3s ease-in-out;
+}
+
+@keyframes flash {
+  0% {
+    box-shadow: 0 0 40px 20px rgba(255, 255, 0, 0.9);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+    transform: scale(1);
+  }
+}

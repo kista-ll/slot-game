@@ -1,4 +1,5 @@
 import React from 'react';
+import './BetControls.css';
 
 type Props = {
   bet: number;

@@ -1,7 +1,3 @@
-以下は、あなたのスロットゲームの仕様書です。音声演出の追加や絵柄ごとの当たり音再生など、最新の実装内容を反映しています 🎰🔊
-
----
-
 ## 🎯 スロットゲーム仕様書（React + TypeScript）
 
 ### 1. ゲーム概要
@@ -10,19 +6,20 @@
 - 絵柄が揃うと倍率に応じた報酬を獲得
 - スピン・ストップ・当たり時に音声演出あり
 - 履歴・絵柄出現回数をローカルストレージに保存
+- リール停止ボタンは各リールに統合済み（Reel.tsx内）
 
 ---
 
-### 2. 絵柄と倍率設定
+### 2. 絵柄と倍率設定（順番変更済み）
 
 | 絵柄 | 倍率 | 当たり音 |
 |------|------|-----------|
 | 🍒   | 2倍  | win1.mp3  |
 | 🍋   | 3倍  | win1.mp3  |
-| 🔔   | 5倍  | win1.mp3  |
-| ⭐   | 8倍  | win1.mp3  |
-| 🍀   | 10倍 | win1.mp3  |
 | 7️⃣  | 20倍 | win2.mp3  |
+| 🔔   | 5倍  | win1.mp3  |
+| 🍀   | 10倍 | win1.mp3  |
+| ⭐   | 8倍  | win1.mp3  |
 
 ---
 
@@ -47,9 +44,7 @@ const playSound = (src: string) => {
   const audio = new Audio(src);
   audio.volume = 1.0;
   audio.muted = false;
-  audio.play().catch((err) => {
-    console.error('Audio playback failed:', err);
-  });
+  audio.play().catch(() => {});
   audioRef.current = audio;
 };
 ```
@@ -80,7 +75,7 @@ const playWinSound = (symbol: string) => {
 
 ---
 
-### 4. スピン処理
+### 4. スピン処理（SlotMachine.tsx）
 
 ```ts
 const startSpin = () => {
@@ -94,53 +89,20 @@ const startSpin = () => {
     return newScore;
   });
   playSound('/sounds/spin.wav');
-  reelRefs.forEach((ref) => {
-    if (ref.current) {
-      void ref.current.offsetWidth;
-      ref.current.classList.add('fast');
-      ref.current.style.transform = 'translateY(0)';
-    }
-  });
 };
 ```
 
 ---
 
-### 5. リール停止処理
+### 5. リール停止処理（Reel.tsx）
 
-```ts
-const stopReel = (index: number) => {
-  const reel = reelRefs[index].current;
-  const container = reelContainers[index].current;
-  playSound('/sounds/stop.mp3');
-  if (reel && container) {
-    const actualY = getTranslateY(reel);
-    reel.classList.remove('fast', 'slow');
-    const centerIndex = getCenterSymbolIndex(actualY);
-    const symbol = symbolList[centerIndex];
-    const translateY = -(centerIndex * symbolHeight);
-    reel.style.transform = `translateY(${translateY}px)`;
-    const betLevel = bet >= 50 ? 'high' : bet <= 10 ? 'low' : '';
-    container.setAttribute('data-bet', betLevel);
-    container.classList.add('stopping');
-    setTimeout(() => container.classList.remove('stopping'), 300);
-    setResult((prev) => {
-      const updated = [...prev];
-      updated[index] = symbol;
-      return updated;
-    });
-  }
-  setSpinning((prev) => {
-    const updated = [...prev];
-    updated[index] = false;
-    return updated;
-  });
-};
-```
+- 停止ボタンは各リールに統合されており、`spinning` が `true` のときのみ表示
+- 停止時に絵柄を中央に揃え、演出（拡大・浮き上がり）を適用
+- 停止後に `onStop(symbol)` を親に通知
 
 ---
 
-### 6. 当たり判定と報酬処理
+### 6. 当たり判定と報酬処理（SlotMachine.tsx）
 
 ```ts
 useEffect(() => {
@@ -182,13 +144,21 @@ useEffect(() => {
 
 ---
 
-### 8. 拡張のアイデア 💡
+### 8. コンポーネント構成
+
+| ファイル名         | 役割                                 |
+|--------------------|--------------------------------------|
+| `SlotMachine.tsx`  | ゲーム全体の状態管理とUI             |
+| `Reel.tsx`         | リールの描画・回転・停止・演出       |
+| `BetControls.tsx`  | ベット額の調整UI                     |
+| `Reel.css`         | リールの見た目とアニメーション       |
+| `SlotMachine.css`  | ゲーム全体のレイアウトと共通スタイル |
+
+---
+
+### 9. 拡張のアイデア 💡
 - 🎵 音量調整スライダーの追加
 - 🎨 絵柄ごとのアニメーション演出
 - 🏆 スコアランキング機能（ローカル or サーバー連携）
 - 🔁 オートスピン機能
-
----
-
-この仕様書をベースに、さらに演出や機能を追加していくこともできます。  
-もしPDFやドキュメント形式でまとめたい場合は、別途ご相談ください！
+- 🎧 音声コントローラーの導入（音が増えたら）
